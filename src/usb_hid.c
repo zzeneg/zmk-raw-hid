@@ -50,7 +50,15 @@ static void send_report(const uint8_t *data, uint8_t len) {
     k_sem_take(&hid_sem, K_MSEC(30));
 
     LOG_INF("USB - Sending Raw HID report of length %i", len);
-    uint8_t report[CONFIG_RAW_HID_REPORT_SIZE] = {0};
+    /*
+     * Static, not on the stack: the nRF USB device DMAs straight out of this
+     * buffer, and the transfer outlives the call. A stack buffer sends its
+     * first bytes correctly and then whatever the stack holds by then -- which
+     * looks like a report with a good header and RAM pointers in the tail.
+     * hid_sem is held until in_ready_cb, so only one transfer reads it at once.
+     */
+    static uint8_t report[CONFIG_RAW_HID_REPORT_SIZE];
+    memset(report, 0, sizeof(report));
     memcpy(report, data, len);
     LOG_HEXDUMP_DBG(report, CONFIG_RAW_HID_REPORT_SIZE, "USB - Sending Raw HID report");
 
